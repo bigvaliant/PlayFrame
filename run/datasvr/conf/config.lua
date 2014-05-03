@@ -1,0 +1,5 @@
+gamesvr_zmq_addr = "ipc:///tmp/gamesvr_datasvr"
+mysql_host = "localhost"
+mysql_user = "root"
+mysql_password = "123456"
+mysql_dbname = "sg_db"

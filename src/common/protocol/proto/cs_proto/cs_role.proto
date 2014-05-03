@@ -1,0 +1,18 @@
+package ProtoCs;
+
+enum CsRoleProtoRet {
+    option allow_alias = true;
+    RET_LOGIN_OK = 0;
+    RET_LOGIN_FAILED = -1;
+    RET_LOGIN_GAMESVR_FULL = -2;
+}
+
+message LoginReq {
+    optional bytes account = 1;
+    optional bytes password = 2;
+}
+
+message LoginRes {
+    optional bool numb = 1;
+}
+

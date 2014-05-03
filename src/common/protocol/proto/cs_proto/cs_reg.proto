@@ -1,0 +1,57 @@
+package ProtoCs;
+
+enum CsRegProtoRet {
+    option allow_alias = true;
+    // 快速注册
+    RET_QUICK_REG_OK = 0;
+    RET_QUICK_REG_FAILED = -1;
+    RET_QUICK_REG_GAMESVR_FULL = -2;
+    // 正常注册
+    RET_NORMAL_REG_OK = 0;
+    RET_NORMAL_REG_FAILED = -1;
+    RET_NORMAL_REG_GAMESVR_FULL = -2;
+    // 绑定账号 
+    RET_BIND_ACCOUNT_OK = 0;
+    RET_BIND_ACCOUNT_FAILED = -1;
+    // 修改密码
+    RET_EDIT_PASSWORD_OK = 0;
+    RET_EDIT_PASSWORD_FAILED = -1;
+}
+
+message QuickRegReq {
+    optional bool numb = 1;
+}
+
+message QuickRegRes {
+    optional bytes account = 1;
+    optional bytes password = 2;
+}
+
+message NormalRegReq {
+    optional bytes account = 1;
+    optional bytes password = 2;
+}
+
+message NormalRegRes {
+    optional bytes account = 1;
+    optional bytes password = 2;
+}
+
+message BindAccountReq {
+    optional bytes account = 1;
+    optional bytes password = 2;
+}
+
+message BindAccountRes {
+    optional bool numb = 1;
+}
+
+message EditPasswordReq {
+    optional bytes old_password = 1;
+    optional bytes new_password = 2;
+}
+
+message EditPasswordRes {
+    optional bool numb = 1;
+}
+

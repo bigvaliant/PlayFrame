@@ -1,0 +1,83 @@
+package ProtoSs;
+
+enum SsDataProtoRet {
+    option allow_alias = true;
+    // 账户注册
+    RET_ACCOUNT_REG_OK = 0;
+    RET_ACCOUNT_REG_FAILED = -1;
+    RET_ACCOUNT_REG_DUP = -2;
+    // 绑定账户
+    RET_BIND_ACCOUNT_OK = 0;
+    RET_BIND_ACCOUNT_FAILED = -1;
+    RET_BIND_ACCOUNT_REG_DUP = -2;
+    // 修改密码
+    RET_EDIT_PASSWORD_OK = 0;
+    RET_EDIT_PASSWORD_FAILED = -1;
+    // 账户验证
+    RET_ACCOUNT_VERIFY_OK = 0;
+    RET_ACCOUNT_VERIFY_FAILED = -1;
+    // 获取PLAYER DATA
+    RET_GET_PLAYER_DATA_OK = 0;
+    RET_GET_PLAYER_DATA_FAILED = -1;
+    // 设置PLAYER DATA
+    RET_SET_PLAYER_DATA_OK = 0;
+    RET_SET_PLAYER_DATA_FAILED = -1;
+}
+
+message AccountRegReq {
+    optional uint64 uid = 1;
+    optional uint64 password_hash = 2;
+    optional bytes account = 3;
+    optional bytes player_data = 4;
+}
+
+message AccountRegRes {
+    optional bool numb = 1;
+}
+
+message BindAccountReq {
+    optional uint64 uid = 1;
+    optional bytes account = 2;
+    optional bytes password_hash = 3;
+}
+
+message BindAccountRes {
+    optional bool numb = 1;
+}
+
+message EditPasswordReq {
+    optional uint64 uid = 1;
+    optional uint64 old_password_hash= 2;
+    optional uint64 new_password_hash = 3;
+}
+
+message EditPasswordRes {
+    optional bool numb = 1;
+}
+
+message AccountVerifyReq {
+    optional uint64 uid = 1;
+    optional uint64 password_hash = 2;
+}
+
+message AccountVerifyRes {
+    optional bool numb = 1;
+}
+
+message GetPlayerDataReq {
+    optional uint64 uid = 1;
+    optional uint64 password_hash = 2;
+}
+
+message GetPlayerDataRes {
+    optional bytes player_data = 1;
+}
+
+message SetPlayerDataReq {
+    optional uint64 uid = 1;
+    optional bytes player_data = 2;
+}
+
+message SetPlayerDataRes {
+    optional bool numb = 1;
+}

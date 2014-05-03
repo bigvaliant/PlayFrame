@@ -1,0 +1,17 @@
+package Database;
+
+message RoleInfo {
+    optional int32 money = 1;
+    optional int32 level = 2;
+}
+
+message CityInfo {
+    optional int32 id = 1;
+    optional int32 population = 2;
+}
+
+message PlayerData {
+    optional RoleInfo role_info = 1;
+    repeated CityInfo city_list = 2;
+}
+
