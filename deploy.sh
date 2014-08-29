@@ -1,3 +1,11 @@
+#######################################
+# @file deploy.sh
+# @brief 部署运行环境
+# @author fergus <zfengzhen@gmail.com>
+# @version 
+# @date 2014-08-29
+#######################################
+
 #!/bin/sh
 
 cur_dir=$(cd `dirname $0`; pwd)

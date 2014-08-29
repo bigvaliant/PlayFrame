@@ -1,3 +1,11 @@
+#######################################
+# @file cmake.sh
+# @brief 编译脚本
+# @author fergus <zfengzhen@gmail.com>
+# @version 
+# @date 2014-08-29
+#######################################
+
 #!/bin/sh
 
 mkdir -p build
