@@ -9,11 +9,11 @@
 #!/bin/sh
 cd `dirname $0`
 
-rm -rf ../../../run/script/gamesvr/*
+rm -rf ../../../../run/gamesvr/script/*
 
 filelist=`ls *.lua`
 for file in $filelist; do
-    ../../common/dep/lua/bin/luac -o ../../../../run/gamesvr/script/$file $file
+    ../../../common/dep/lua/bin/luac -o ../../../../run/gamesvr/script/$file $file
 done
 
 cp *.so ../../../../run/script/gamesvr/
