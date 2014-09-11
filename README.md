@@ -7,7 +7,8 @@ A game server develop framework for using lua coroutine as asynchronous task.
 ![](https://github.com/zfengzhen/Blog/blob/master/img/PlayFrame游戏架构.png)
 
 ## C++类成员函数回调实现
-C++类成员函数回调跟C函数回调不同的是C++类成员函数必须绑定类的实例, 知道是具体某个实例的回调.    
+C++类成员函数回调跟C函数回调不同的是必须绑定类的实例, 知道是具体某个实例的回调.   
+   
 1 实现一个虚基类, 使其拥有一个固定的回调执行函数.     
 ```c++
 class CallbackBase
