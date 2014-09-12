@@ -15,19 +15,19 @@ class CallbackBase
 {
 public:
     virtual ~CallbackBase() {};
-    virtual int32_t Execute(int32_t code, void* data) = 0;
+    virtual int32_t Execute(int64_t code, void* data) = 0;
 };
 
 template<class T>
 class Callback : public CallbackBase
 {
 public:
-    typedef int32_t (T::*Func)(int32_t code, void* data);
+    typedef int32_t (T::*Func)(int64_t code, void* data);
 
     Callback(T* obj, Func func) : obj_(obj), func_(func) {}
     virtual ~Callback() {};
 
-    int32_t Execute(int32_t code, void* data)
+    int32_t Execute(int64_t code, void* data)
     {
         return (obj_->*func_)(code, data);
     }
@@ -53,7 +53,7 @@ public:
         callback_ = new((void*)storage_)Callback<T>(obj, func);
     }
 
-    int32_t Execute(int32_t code, void* data)
+    int32_t Execute(int64_t code, void* data)
     {
         return callback_->Execute(code, data);
     }

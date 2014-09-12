@@ -26,13 +26,13 @@ public:
 
 public:
     void    Poll();
-    TimerHeap* GetTimerHeap()
+    HeapTimer* GetTimerHeap()
     {
-        return timer_heap_;
+        return heap_timer_;
     }
 
 private:
-    TimerHeap*      timer_heap_;
+    HeapTimer*      heap_timer_;
 };
 
 #endif // _TIMER_MGR_MODULE_H_

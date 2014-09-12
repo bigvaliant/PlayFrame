@@ -2,8 +2,8 @@ PROJECT(game)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 #编译参数
-SET(CMAKE_C_FLAGS "-Wall -g -ggdb -Wextra -pipe -Wno-invalid-offsetof -Wunused -Wno-deprecated")
-SET(CMAKE_CXX_FLAGS "-Wall -g -ggdb -Wextra -pipe -Wno-invalid-offsetof -Wunused -Wno-deprecated")
+SET(CMAKE_C_FLAGS "-Wall -g -ggdb -Wextra -pipe -Wno-invalid-offsetof -Wunused -D__X86_64")
+SET(CMAKE_CXX_FLAGS "-Wall -g -ggdb -Wextra -pipe -Wno-invalid-offsetof -Wunused -D__X86_64")
 
 #预定义
 ADD_DEFINITIONS(-D_GNU_SOURCE -D_REENTRANT)

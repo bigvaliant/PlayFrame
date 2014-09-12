@@ -11,7 +11,7 @@
 
 TimerMgrModule::TimerMgrModule(App* app)
 	: AppModuleBase(app),
-      timer_heap_(NULL)
+      heap_timer_(NULL)
 {}
 
 TimerMgrModule::~TimerMgrModule()
@@ -22,9 +22,9 @@ void TimerMgrModule::ModuleInit()
     ConfigModule* conf_module = FindModule<ConfigModule>(app_);
 
     // timer_heap 初始化
-    timer_heap_ = new TimerHeap(conf_module->GetTimerInitSize());
+    heap_timer_ = new HeapTimer(conf_module->GetTimerInitSize());
 
-    CHECK(timer_heap_ != NULL)
+    CHECK(heap_timer_ != NULL)
         << "timer heap init error!";
 
 	LOG(INFO) << ModuleName() << " init ok!";
@@ -32,9 +32,9 @@ void TimerMgrModule::ModuleInit()
 
 void TimerMgrModule::ModuleFini()
 {
-    if (timer_heap_ != NULL) {
-        delete timer_heap_;
-        timer_heap_ = NULL;
+    if (heap_timer_ != NULL) {
+        delete heap_timer_;
+        heap_timer_ = NULL;
     }
 
 	LOG(INFO) << ModuleName() << " fini completed!";
@@ -64,6 +64,6 @@ AppModuleBase* TimerMgrModule::CreateModule(App* app)
 void TimerMgrModule::Poll()
 {
     TimeValue now = TimeValue::Time();
-    timer_heap_->TimerPoll(now);
+    heap_timer_->TimerPoll(now);
 }
 

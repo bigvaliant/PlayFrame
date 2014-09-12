@@ -10,7 +10,7 @@
 
 #include "comm_def.h"
 #include "callback.h"
-#include "timer_heap.h"
+#include "heap_timer.h"
 #include "random.h"
 #include "lua_tinker.h"
 
@@ -32,13 +32,16 @@ public:
     void AddRequirePath(const char* str);
     void AddRequireCPath(const char* str);
     void Init(const char* main_script_file);
-    int32_t OnTimer(int32_t timer_id, void* data);
+    void Fini();
+    int32_t OnTimer(int64_t timer_id, void* data);
 
     void Run()
     {
         TimeValue now = TimeValue::Time();
-        timer_heap_->TimerPoll(now);
+        heap_timer_->TimerPoll(now);
     }
+
+    int32_t GetTaskSize();
 
     template<typename T>
     T GetGlobal(const char* name)
@@ -149,8 +152,189 @@ public:
         return lua_tinker::call<R, T1, T2, T3, T4, T5>(master_state_, func, t1, t2, t3, t4, t5);
     }
 
-    uint64_t CreateTask(const char* lua_func, time_t task_delay_secs);
-    void Resume(uint64_t task_id, int32_t check_sig);
+    int64_t CreateTask(const char* lua_func, time_t task_delay_secs);
+    void Resume(int64_t task_id);
+
+    template<class T1>
+    void Resume(int64_t task_id, T1 t1)
+    {
+        LOG(INFO) << "resume task[" << task_id << "]";
+
+        if (task_id > 0 && co_map_[task_id] != NULL) {
+            lua_State* co = co_map_[task_id];
+
+            lua_tinker::push(co, t1);
+            int32_t ret = lua_resume(co, 1);
+            if (ret != LUA_YIELD && ret != 0) {
+                LOG(ERROR) << "lua_resume failed. ret[" << ret << "]";
+                lua_tinker::enum_stack(co);
+            }
+            if (ret != LUA_YIELD)
+                CloseTask(task_id);
+        }
+    }
+
+    template<class T1, class T2>
+    void Resume(int64_t task_id, T1 t1, T2 t2)
+    {
+        LOG(INFO) << "resume task[" << task_id << "]";
+
+        if (task_id > 0 && co_map_[task_id] != NULL) {
+            lua_State* co = co_map_[task_id];
+
+            lua_tinker::push(co, t1);
+            lua_tinker::push(co, t2);
+            int32_t ret = lua_resume(co, 2);
+            if (ret != LUA_YIELD && ret != 0) {
+                LOG(ERROR) << "lua_resume failed. ret[" << ret << "]";
+                lua_tinker::enum_stack(co);
+            }
+            if (ret != LUA_YIELD)
+                CloseTask(task_id);
+        }
+    }
+
+    template<class T1, class T2, class T3>
+    void Resume(int64_t task_id, T1 t1, T2 t2, T3 t3)
+    {
+        LOG(INFO) << "resume task[" << task_id << "]";
+
+        if (task_id > 0 && co_map_[task_id] != NULL) {
+            lua_State* co = co_map_[task_id];
+
+            lua_tinker::push(co, t1);
+            lua_tinker::push(co, t2);
+            lua_tinker::push(co, t3);
+            int32_t ret = lua_resume(co, 3);
+            if (ret != LUA_YIELD && ret != 0) {
+                LOG(ERROR) << "lua_resume failed. ret[" << ret << "]";
+                lua_tinker::enum_stack(co);
+            }
+            if (ret != LUA_YIELD)
+                CloseTask(task_id);
+        }
+    }
+
+    template<class T1, class T2, class T3, class T4>
+    void Resume(int64_t task_id, T1 t1, T2 t2, T3 t3, T4 t4)
+    {
+        LOG(INFO) << "resume task[" << task_id << "]";
+
+        if (task_id > 0 && co_map_[task_id] != NULL) {
+            lua_State* co = co_map_[task_id];
+
+            lua_tinker::push(co, t1);
+            lua_tinker::push(co, t2);
+            lua_tinker::push(co, t3);
+            lua_tinker::push(co, t4);
+            int32_t ret = lua_resume(co, 4);
+            if (ret != LUA_YIELD && ret != 0) {
+                LOG(ERROR) << "lua_resume failed. ret[" << ret << "]";
+                lua_tinker::enum_stack(co);
+            }
+            if (ret != LUA_YIELD)
+                CloseTask(task_id);
+        }
+    }
+
+    template<class T1, class T2, class T3, class T4, class T5>
+    void Resume(int64_t task_id, T1 t1, T2 t2, T3 t3, T4 t4, T5 t5)
+    {
+        LOG(INFO) << "resume task[" << task_id << "]";
+
+        if (task_id > 0 && co_map_[task_id] != NULL) {
+            lua_State* co = co_map_[task_id];
+
+            lua_tinker::push(co, t1);
+            lua_tinker::push(co, t2);
+            lua_tinker::push(co, t3);
+            lua_tinker::push(co, t4);
+            lua_tinker::push(co, t5);
+            int32_t ret = lua_resume(co, 5);
+            if (ret != LUA_YIELD && ret != 0) {
+                LOG(ERROR) << "lua_resume failed. ret[" << ret << "]";
+                lua_tinker::enum_stack(co);
+            }
+            if (ret != LUA_YIELD)
+                CloseTask(task_id);
+        }
+    }
+
+    template<class T1, class T2, class T3, class T4, class T5, class T6>
+    void Resume(int64_t task_id, T1 t1, T2 t2, T3 t3, T4 t4, T5 t5, T6 t6)
+    {
+        LOG(INFO) << "resume task[" << task_id << "]";
+
+        if (task_id > 0 && co_map_[task_id] != NULL) {
+            lua_State* co = co_map_[task_id];
+
+            lua_tinker::push(co, t1);
+            lua_tinker::push(co, t2);
+            lua_tinker::push(co, t3);
+            lua_tinker::push(co, t4);
+            lua_tinker::push(co, t5);
+            lua_tinker::push(co, t6);
+            int32_t ret = lua_resume(co, 6);
+            if (ret != LUA_YIELD && ret != 0) {
+                LOG(ERROR) << "lua_resume failed. ret[" << ret << "]";
+                lua_tinker::enum_stack(co);
+            }
+            if (ret != LUA_YIELD)
+                CloseTask(task_id);
+        }
+    }
+
+    template<class T1, class T2, class T3, class T4, class T5, class T6, class T7>
+    void Resume(int64_t task_id, T1 t1, T2 t2, T3 t3, T4 t4, T5 t5, T6 t6, T7 t7)
+    {
+        LOG(INFO) << "resume task[" << task_id << "]";
+
+        if (task_id > 0 && co_map_[task_id] != NULL) {
+            lua_State* co = co_map_[task_id];
+
+            lua_tinker::push(co, t1);
+            lua_tinker::push(co, t2);
+            lua_tinker::push(co, t3);
+            lua_tinker::push(co, t4);
+            lua_tinker::push(co, t5);
+            lua_tinker::push(co, t6);
+            lua_tinker::push(co, t7);
+            int32_t ret = lua_resume(co, 7);
+            if (ret != LUA_YIELD && ret != 0) {
+                LOG(ERROR) << "lua_resume failed. ret[" << ret << "]";
+                lua_tinker::enum_stack(co);
+            }
+            if (ret != LUA_YIELD)
+                CloseTask(task_id);
+        }
+    }
+
+    template<class T1, class T2, class T3, class T4, class T5, class T6, class T7, class T8>
+    void Resume(int64_t task_id, T1 t1, T2 t2, T3 t3, T4 t4, T5 t5, T6 t6, T7 t7, T8 t8)
+    {
+        LOG(INFO) << "resume task[" << task_id << "]";
+
+        if (task_id > 0 && co_map_[task_id] != NULL) {
+            lua_State* co = co_map_[task_id];
+
+            lua_tinker::push(co, t1);
+            lua_tinker::push(co, t2);
+            lua_tinker::push(co, t3);
+            lua_tinker::push(co, t4);
+            lua_tinker::push(co, t5);
+            lua_tinker::push(co, t6);
+            lua_tinker::push(co, t7);
+            lua_tinker::push(co, t8);
+            int32_t ret = lua_resume(co, 8);
+            if (ret != LUA_YIELD && ret != 0) {
+                LOG(ERROR) << "lua_resume failed. ret[" << ret << "]";
+                lua_tinker::enum_stack(co);
+            }
+            if (ret != LUA_YIELD)
+                CloseTask(task_id);
+        }
+    }
+
     void Reload();
     void PrintMemSize(const char* extra=NULL);
     void LuaGarbageCollect();
@@ -158,10 +342,13 @@ public:
     static void LogError(const char* str);
 
 private:
-    void CloseTask(uint64_t task_id);
+    lua_State* FindTask(int64_t task_id);
+    void CloseTask(int64_t task_id);
 private:
+    typedef std::map<int64_t, lua_State*> CoroutineMap;
+    CoroutineMap        co_map_;
     lua_State*          master_state_;
-    TimerHeap*          timer_heap_;
+    HeapTimer*          heap_timer_;
     Random              rand_maker_;
     std::ostringstream  oss_require_path_;
     std::ostringstream  oss_require_cpath_;

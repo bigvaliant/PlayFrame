@@ -22,6 +22,10 @@ int32_t MsgMgr::Init()
     // 注册消息
     REGISTER_MSG(ProtoCs::Msg::kLoginReqFieldNumber, &MsgMgr::DoLogin,
         ProtoCs::Msg::kLoginResFieldNumber, &MsgMgr::OnLogin);
+    REGISTER_MSG(ProtoCs::Msg::kNormalRegReqFieldNumber, &MsgMgr::DoNormalReg,
+        ProtoCs::Msg::kNormalRegResFieldNumber, &MsgMgr::OnNormalReg);
+    REGISTER_MSG(ProtoCs::Msg::kQuickRegReqFieldNumber, &MsgMgr::DoQuickReg,
+        ProtoCs::Msg::kQuickRegResFieldNumber, &MsgMgr::OnQuickReg);
 
     return 0;
 }
@@ -127,6 +131,60 @@ int32_t MsgMgr::OnLogin(ProtoCs::Msg* msg, void* args)
         printf("Login ok!\n");
     } else {
         printf("Login failed!\n");
+    }
+
+    return 0;
+}
+
+int32_t MsgMgr::DoNormalReg(ProtoCs::Msg* msg, void* args)
+{
+    printf("DoNormalReg\n");
+    (void)args;
+    ProtoCs::NormalRegReq* normal_reg_req = msg->mutable_normal_reg_req();
+
+    normal_reg_req->set_account("zhangfengzhen");
+    normal_reg_req->set_password("qwe123456");
+
+    return 0;
+}
+
+int32_t MsgMgr::OnNormalReg(ProtoCs::Msg* msg, void* args)
+{
+    printf("OnNormalReg\n");
+    (void)args;
+    int32_t msg_ret = msg->mutable_head()->ret();
+
+    if (msg_ret == 0) {
+        printf("NormalReg ok!\n");
+    } else {
+        printf("NormalReg failed!\n");
+    }
+
+    return 0;
+}
+
+int32_t MsgMgr::DoQuickReg(ProtoCs::Msg* msg, void* args)
+{
+    printf("DoQuickReg\n");
+    (void)args;
+    // ProtoCs::QuickRegReq* quick_reg_req = msg->mutable_quick_reg_req();
+
+    return 0;
+}
+
+int32_t MsgMgr::OnQuickReg(ProtoCs::Msg* msg, void* args)
+{
+    printf("OnQuickReg\n");
+    (void)args;
+    int32_t msg_ret = msg->mutable_head()->ret();
+
+    if (msg_ret == 0) {
+        printf("QuickReg ok!\n");
+        printf("account [%s] password[%s]\n", 
+            msg->quick_reg_res().account().c_str(),
+            msg->quick_reg_res().password().c_str());
+    } else {
+        printf("QuickReg failed!\n");
     }
 
     return 0;

@@ -8,7 +8,7 @@
 #include "lua_engine.h"
 
 LuaEngine::LuaEngine()
-    :master_state_(NULL), timer_heap_(NULL), rand_maker_(0)
+    :master_state_(NULL), heap_timer_(NULL), rand_maker_(0)
 {
 }
 
@@ -40,13 +40,27 @@ void LuaEngine::AddRequireCPath(const char* str)
     oss_require_cpath_ << str << "//?.so;";
 }
 
+void LuaEngine::Fini()
+{
+    CoroutineMap::const_reverse_iterator it = co_map_.rbegin();
+    while (it != co_map_.rend()) {
+        lua_State* co= it->second;
+        if (co != NULL) {
+            lua_close(co);
+            co = NULL;
+        }
+        ++it;
+    }
+}
+
 void LuaEngine::Init(const char* main_script_file)
 {
+    Fini();
     int ret = 0;
 
     // TODO: 定时器个数采用宏配置
-    timer_heap_ = new TimerHeap(1024);
-    CHECK(timer_heap_ != NULL)
+    heap_timer_ = new HeapTimer(1024);
+    CHECK(heap_timer_ != NULL)
         << "timer heap init error!";
 
     master_state_ = luaL_newstate();
@@ -55,6 +69,8 @@ void LuaEngine::Init(const char* main_script_file)
 
     luaL_openlibs(master_state_);
     lua_tinker::init(master_state_);
+    lua_tinker::init_s64(master_state_);
+    lua_tinker::init_u64(master_state_);
 
     // 将script_main.lua所在文件夹路径加入require路径搜索
     char script_path[256] = {0};
@@ -95,8 +111,8 @@ void LuaEngine::Init(const char* main_script_file)
     SetGlobal("LUA_SCRIPT_PATH", script_path);
 
     // 注册log函数
-    RegFunc("LOG_INFO", &LuaEngine::LogInfo);
-    RegFunc("LOG_ERROR", &LuaEngine::LogError);
+    RegFunc("C_LOG_INFO", &LuaEngine::LogInfo);
+    RegFunc("C_LOG_ERROR", &LuaEngine::LogError);
     // lua_tinker中日志函数
     RegFunc("_ALERT", &LuaEngine::LogInfo);
 
@@ -110,10 +126,6 @@ void LuaEngine::Init(const char* main_script_file)
     // 第一次加载模块
     Reload();
 
-    // 创建协程TABLE
-    lua_newtable(master_state_);
-    lua_setglobal(master_state_, "CO_TABLE");
-
     // 设置检查信号宏
     SetGlobal<int>("CHECK_SIG_OK", CHECK_SIG_OK);
     SetGlobal<int>("CHECK_SIG_TIMEOUT", CHECK_SIG_TIMEOUT);
@@ -122,56 +134,39 @@ void LuaEngine::Init(const char* main_script_file)
     SetHandler(this, &LuaEngine::OnTimer);
 }
 
-int32_t LuaEngine::OnTimer(int32_t timer_id, void* data)
+int32_t LuaEngine::OnTimer(int64_t task_id, void* data)
 {
     UNUSE_ARG(data);
-    LOG(INFO)
-        << "on_timer: timer_id[" << timer_id
-        << "]";
+    LOG(INFO) << "OnTimer: task_id[" << task_id << "] TIMEOUT!!!!";
 
-    int32_t rand_id = 0;
-    uint64_t task_id = ((uint64_t)timer_id << 32) | ((uint64_t)rand_id);
-
-    // 传入TIMEOUT信号，lua逻辑做超时处理
-    Resume(task_id, CHECK_SIG_TIMEOUT);
-    // 返回-1 定时器释放
+    CloseTask(task_id);
     return -1;
 }
 
-uint64_t LuaEngine::CreateTask(const char* lua_func, time_t task_delay_secs)
+int64_t LuaEngine::CreateTask(const char* lua_func, time_t task_delay_secs)
 {
     PrintMemSize("before create_task");
-    lua_tinker::enum_stack(master_state_);
     // 分配定时器
-    int32_t timer_id = timer_heap_->RegisterTimer(
+    int64_t task_id = heap_timer_->RegisterTimer(
         TimeValue(task_delay_secs),
         TimeValue(task_delay_secs),
         this,
         NULL);
 
-    // timer_id 分配失败
-    if (timer_id <= 0) {
+    // task_id 分配失败
+    if (task_id <= 0) {
         LOG(ERROR) << "alloc timer failed!";
-        return 0;
+        return -1;
     }
 
-    int rand_id = rand_maker_.GetRand();
-    uint64_t task_id = ((uint64_t)timer_id << 32) | ((uint64_t)rand_id);
-
-    // 以timer_id为lua中CO_TABLE的索引
-    // 创建协程
-    lua_getglobal(master_state_, "CO_TABLE");
-    lua_pushinteger(master_state_, timer_id);
-    lua_State *co = lua_newthread(master_state_);
-    lua_settable(master_state_, -3);
-
-    // 弹出CO_TABLE
+    lua_State* co = lua_newthread(master_state_);
+    if (co == NULL) {
+        LOG(ERROR) << "lua_newthread error!"; 
+        return -1;
+    }
     lua_pop(master_state_, 1);
 
-    // 压入task_id lua逻辑session保存
-    SetGlobal<uint64_t>("TASK_ID", task_id);
-    SetGlobal<int32_t>("RAND_ID", rand_id);
-    SetGlobal<int32_t>("TIMER_ID", timer_id);
+    co_map_[task_id] = co;
 
     // 将lua_func压入新创建的协程
     lua_getglobal(co, lua_func);
@@ -181,86 +176,35 @@ uint64_t LuaEngine::CreateTask(const char* lua_func, time_t task_delay_secs)
         return 0;
     }
 
-    LOG(INFO)
-        << "create task[" << task_id
-        << "] timer_id[" << timer_id
-        << "] rand_id[" << rand_id
-        << "]";
+    LOG(INFO) << "create task[" << task_id << "]";
+    LOG(INFO) << "TaskSize[" << GetTaskSize() << "]";
 
     return task_id;
 }
 
-void LuaEngine::CloseTask(uint64_t task_id)
+void LuaEngine::CloseTask(int64_t task_id)
 {
-    int32_t timer_id = (int32_t)(task_id >> 32);
-    int32_t rand_id = (int32_t)(task_id & 0xffffffff);
-
-    // 根据time_id去CO_TABLE查找相应的协程
-    // 置为nil释放
-    // 释放定时器
-    if (timer_id > 0) {
+    if (task_id > 0 && co_map_[task_id] != NULL) {
         LOG(INFO)
             << "close task[" << task_id
-            << "] timer_id[" << timer_id
-            << "] rand_id[" << rand_id
             << "]";
-
-        lua_getglobal(master_state_, "CO_TABLE");
-        lua_pushinteger(master_state_, timer_id);
-        lua_pushnil(master_state_);
-        lua_settable(master_state_, -3);
-
-        // 弹出CO_TABLE
-        lua_pop(master_state_, 1);
-
-        timer_heap_->UnregisterTimer(timer_id);
-
-        // lua_garbage_collect();
+        lua_close(co_map_[task_id]);
+        co_map_.erase(task_id);
+        heap_timer_->UnregisterTimer(task_id);
     }
 
     PrintMemSize("after close_task");
     lua_tinker::enum_stack(master_state_);
+    LOG(INFO) << "TaskSize[" << GetTaskSize() << "]";
     return;
 }
 
-void LuaEngine::Resume(uint64_t task_id, int32_t check_sig)
+void LuaEngine::Resume(int64_t task_id)
 {
-    int32_t timer_id = (int32_t)(task_id >> 32);
-    int32_t rand_id = (int32_t)(task_id & 0xffffffff);
+    LOG(INFO) << "resume task[" << task_id << "]";
 
-    LOG(INFO)
-        << "resume task[" << task_id
-        << "] timer_id[" << timer_id
-        << "] rand_id[" << rand_id
-        << "] check_sig[" << check_sig
-        << "]";
-
-    if (timer_id > 0) {
-        lua_getglobal(master_state_, "CO_TABLE");
-        lua_pushinteger(master_state_, timer_id);
-        lua_gettable(master_state_, -2);
-
-        if (lua_isthread(master_state_, -1) == 0) {
-            LOG(ERROR)
-                << "CO_TABLE[" << timer_id
-                << "] is not thread!";
-            return;
-        }
-
-        lua_tinker::enum_stack(master_state_);
-        lua_State* co = lua_tothread(master_state_, -1);
-        if (co == NULL) {
-            LOG(ERROR)
-                << "CO_TABLE[" << timer_id
-                << "] lua_tothread is NULL";
-            return;
-        }
-
-        lua_pop(master_state_, 2);
-
-        // 设置异常信号以及RAND_ID校验
-        SetGlobal<int>("CHECK_SIG", check_sig);
-        SetGlobal<int>("CHECK_RAND_ID", rand_id);
+    if (task_id > 0 && co_map_[task_id] != NULL) {
+        lua_State* co = co_map_[task_id];
 
         int32_t ret = lua_resume(co, 0);
         if (ret != LUA_YIELD && ret != 0) {
@@ -302,3 +246,17 @@ void LuaEngine::LuaGarbageCollect()
     lua_gc(master_state_, LUA_GCCOLLECT, 0);
 }
 
+lua_State* LuaEngine::FindTask(int64_t task_id)
+{
+    CoroutineMap::const_iterator it = co_map_.find(task_id);
+    if (it == co_map_.end()) {
+        return NULL;
+    } else {
+        return it->second;
+    }
+}
+
+int32_t LuaEngine::GetTaskSize()
+{
+    return (int32_t)co_map_.size();
+}

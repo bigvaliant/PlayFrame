@@ -19,17 +19,10 @@ function rand_str(num)
 end
 
 -- 快速注册
-function quick_reg()
-    local task_id = TASK_ID
-    local rand_id = RAND_ID
-    local timer_id = TIMER_ID
-    local seq = SEQ
-    local player_idx = PLAYER_IDX
-    local res_cmd = RES_CMD
-
+function quick_reg(task_id, seq, player_idx, res_cmd)
     local player = OBJ_MGR_MODULE:get_player(player_idx)
     if (player == nil) then
-        LOG_INFO("player is nil")
+        LOG_INFO("%s", "player is nil")
         player:send_failed_cs_res(seq, res_cmd, -1)
         return
     end
@@ -44,16 +37,12 @@ function quick_reg()
         password = rand_str(8)
         password_len = #password 
         password_hash = fnv_64a_hash(password, password_len)
-        LOG_INFO(password_hash)
+        LOG_INFO("%s", tostring(password_hash))
         player:do_account_reg(task_id, uid, password_hash, "")
 
-        local ret = CO_YIELD(rand_id)
-        if (ret ~= 0) then
-            player:send_failed_cs_res(seq, res_cmd, -1)
-            return
-        end
+        local account_reg_flag = coroutine.yield()
 
-        if (ACCOUNT_REG_FLAG == 0) then
+        if (account_reg_flag == 0) then
             player:send_ok_cs_quick_reg_res(seq, uid, password)
             return
         end
@@ -64,35 +53,32 @@ function quick_reg()
 end
 
 -- 正常注册
-function normal_reg()
-    local task_id = TASK_ID
-    local rand_id = RAND_ID
-    local timer_id = TIMER_ID
-    local seq = SEQ
-    local player_idx = PLAYER_IDX
-    local account = ACCOUNT
-    local password = PASSWORD
-    local res_cmd = RES_CMD
-
+function normal_reg(task_id, account, password, seq, player_idx, res_cmd)
     local ret = 0
+    LOG_INFO("task_id: %s ", tostring(task_id))
+    LOG_INFO("account: %s ", tostring(account))
+    LOG_INFO("password: %s ", tostring(password))
+    LOG_INFO("seq: %s ", tostring(seq))
+    LOG_INFO("player_idx: %s ", tostring(player_idx))
+    LOG_INFO("res_cmd: %s ", tostring(res_cmd))
 
     local player = OBJ_MGR_MODULE:get_player(player_idx)
     if (player == nil) then
-        LOG_INFO("player is nil")
+        LOG_INFO("%s", "player is nil")
         player:send_failed_cs_res(seq, -1)
         return
     end
 
     ret = check_account(account, #account)
     if (ret ~= 0) then
-        LOG_INFO("account not vaild [" .. ret .. "]")
+        LOG_INFO("account not vaild [%d]", ret)
         player:send_failed_cs_res(seq, res_cmd, -1)
         return
     end    
 
     ret = check_password(password, #password)
     if (ret ~= 0) then
-        LOG_INFO("passowd not vaild [" .. ret .. "]")
+        LOG_INFO("passowd not vaild [%d]", ret)
         player:send_failed_cs_res(seq, res_cmd, -1)
         return
     end    
@@ -101,13 +87,9 @@ function normal_reg()
     local password_hash = fnv_64a_hash(password, #password)
     player:do_account_reg(task_id, uid, password_hash, account)
 
-    local ret = CO_YIELD(rand_id)
-    if (ret ~= 0) then
-        player:send_failed_cs_res(seq, res_cmd, -1)
-        return
-    end
+    local account_reg_flag = coroutine.yield()
 
-    if (ACCOUNT_REG_FLAG == 0) then
+    if (account_reg_flag == 0) then
         player:send_ok_cs_normal_reg_res(seq, account, password)
         return
     end

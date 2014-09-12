@@ -1,11 +1,11 @@
 /**
- * @file timer_heap.cpp
+ * @file heap_timer.cpp
  * @brief 定时器堆
  * @author fergus <zfengzhen@gmail.com>
  * @version 
  * @date 2014-04-30
  */
-#include "timer_heap.h"
+#include "heap_timer.h"
 
 // 用这种方式进行堆位置运算，更快，不用除和乘
 #define HEAP_ENTRY_TO_INDEX(level, nth)  ((1 << (level)) + (nth) - 1)
@@ -13,31 +13,42 @@
 #define HEAP_LEFT_CHILD(index)           ((((index) + 1) << 1) - 1 + 0)
 #define HEAP_RIGHT_CHILD(index)          ((((index) + 1) << 1) - 1 + 1)
 
-TimerHeap::TimerHeap(uint32_t heap_size)
+HeapTimer::HeapTimer(uint32_t heap_size)
     : heap_size_(heap_size + 1),
       cur_size_(0),
       heap_(NULL),
-      timer_id_(NULL),
-      free_timer_id_(1)
+      timer_node_index_array_(NULL),
+      free_timer_node_index_(1),
+      rand_maker_(0)
 {
+    // TimerNode堆数组
     heap_ = (TimerNode**)new TimerNode*[heap_size_];
-    timer_id_ = (int32_t*)new int32_t[heap_size_];
+
+    // TimerNode索引数组
+    timer_node_index_array_ = (int32_t*)new int32_t[heap_size_];
     for (uint32_t i = 0; i < heap_size_; i++) {
-        timer_id_[i] = -((int32_t)(i + 1));
+        timer_node_index_array_[i] = -((int32_t)(i + 1));
+    }
+
+    // Timer随机数数组
+    rand_array_ = (int32_t*)new int32_t[heap_size_];
+    for (uint32_t i = 0; i < heap_size_; i++) {
+        rand_array_[i] = 0;
     }
 }
 
-TimerHeap::~TimerHeap()
+HeapTimer::~HeapTimer()
 {
     for (uint32_t i = 0; i < heap_size_; i++)
-        if (timer_id_[i] >= 0)
-            delete heap_[timer_id_[i]];
+        if (timer_node_index_array_[i] >= 0)
+            delete heap_[timer_node_index_array_[i]];
 
-    delete[] timer_id_;
+    delete[] timer_node_index_array_;
+    delete[] rand_array_;
     delete[] heap_;
 }
 
-int32_t TimerHeap::RegisterTimer(const TimeValue& interval,
+int64_t HeapTimer::RegisterTimer(const TimeValue& interval,
     const TimeValue& delay,
 	CallbackObject* cb_obj,
     void* data)
@@ -64,17 +75,26 @@ int32_t TimerHeap::RegisterTimer(const TimeValue& interval,
 	RotateUp(new_node, cur_size_, GetParentPos(cur_size_));
 	cur_size_++;
 
+    LOG(INFO) << "RegisterTimer TimerSize[" << GetTimerSize() << "]";
+
 	return new_node->timer_id;
 }
 
-void TimerHeap::UnregisterTimer(int32_t timer_id)
+void HeapTimer::UnregisterTimer(int64_t timer_id)
 {
-	if (timer_id < 0 || timer_id > (int32_t)heap_size_)
+    int32_t timer_node_index = (int32_t)(timer_id >> 32);
+    int32_t rand_num = (int32_t)(timer_id & 0xffffffff);
+
+	if (timer_node_index < 0 || timer_node_index > (int32_t)heap_size_)
 		return;
 
-	int32_t node_pos = timer_id_[timer_id];
+	int32_t node_pos = timer_node_index_array_[timer_node_index];
 	if (node_pos < 0)
 		return;
+
+    int32_t timer_rand = rand_array_[timer_node_index];
+    if (timer_rand != rand_num)
+        return;
 
 	TimerNode* del_node = heap_[node_pos];
 	if (del_node == NULL)
@@ -82,79 +102,80 @@ void TimerHeap::UnregisterTimer(int32_t timer_id)
 
 	RemoveNode(node_pos);
 	delete del_node;
+
+    LOG(INFO) << "UnregisterTimer TimerSize[" << GetTimerSize() << "]";
 	return;
 }
 
-void TimerHeap::TimerPoll(const TimeValue& now)
+void HeapTimer::TimerPoll(const TimeValue& now)
 {
 	if (cur_size_ == 0)
 		return;
 
 	while (cur_size_ > 0 && TimervalGte(now, heap_[0]->expire_time)) {
 		int32_t ret = 0;
-		TimerNode* expire_node = RemoveNode(0);
-        int32_t timer_id = PopFreeTimerId();
-        // 如果在该回调中去调用unregister_timer，会无效，
-        // 因为调用了remove_node将timer_id_上的timer_id回收了
-        // 解决方法是在回调函数中返回-1，让定时器自动释放
+		TimerNode* expire_node = heap_[0];
+        int32_t timer_id = expire_node->timer_id;
+
 		if (expire_node && expire_node->cb_obj)
 			ret = expire_node->cb_obj->Execute(timer_id, expire_node->data);
+
+        // 如果调用了UnregisterTimer则节点被删除
+        if (expire_node == NULL)
+            return;
 
         if (ret == 0 && expire_node != NULL &&
             (0 != expire_node->interval_time.Sec() ||
              0 != expire_node->interval_time.Usec())) {
-            expire_node->expire_time = ExpireTime( now, expire_node->interval_time );
-            expire_node->timer_id = timer_id;
-            RotateUp(expire_node, cur_size_, GetParentPos(cur_size_));
-            cur_size_++;
+            expire_node->expire_time = ExpireTime(now, expire_node->interval_time);
+            RotateDown(expire_node, 0, GetLeftChildPos(0));
         } else {
-            PushFreeTimerId(timer_id);
+            RemoveNode(0);
             delete expire_node;
+            LOG(INFO) << "Callback return < 0 TimerSize[" << GetTimerSize() << "]";
         }
 	}
 
 	return;
 }
 
-TimeValue* TimerHeap::FirstTimeout() const
+TimeValue* HeapTimer::FirstTimeout() const
 {
     if(cur_size_ > 0)
         return &(heap_[0]->expire_time);
     return NULL;
 }
 
-void TimerHeap::GrowHeap()
+void HeapTimer::GrowHeap()
 {
 	// 成倍扩展
 	uint32_t new_size = 2 * heap_size_;
 	TimerNode ** new_heap = NULL;
 
-	// 分配新空间
 	new_heap = (TimerNode **)new TimerNode*[new_size];
-	// 拷贝原有数据
 	memcpy(new_heap, heap_, heap_size_ * sizeof(TimerNode*));
-    // 释放原有数据
     delete heap_;
-	// 设置新数据
 	heap_ = new_heap;
 
-	// 扩展timer_id数组
-	int32_t* new_timer_id = (int32_t *)new int32_t[new_size];
-	// 拷贝数据
-	memcpy(new_timer_id, timer_id_, heap_size_ * sizeof(int32_t));
-    // 释放原有数据
-    delete timer_id_;
-	// 设置新数据
-	timer_id_ = new_timer_id;
-	// 把新元素加到freelist中
+	int32_t* new_timer_node_index_array = (int32_t *)new int32_t[new_size];
+	memcpy(new_timer_node_index_array, timer_node_index_array_, heap_size_ * sizeof(int32_t));
+    delete timer_node_index_array_;
+	timer_node_index_array_ = new_timer_node_index_array;
 	for(uint32_t i = heap_size_; i < new_size; i++)
-		timer_id_[i] = -((int32_t)(i + 1));
+		timer_node_index_array_[i] = -((int32_t)(i + 1));
+
+	int32_t* new_rand_array = (int32_t *)new int32_t[new_size];
+	memcpy(new_rand_array, rand_array_, heap_size_ * sizeof(int32_t));
+    delete rand_array_;
+	rand_array_ = new_rand_array;
+	for(uint32_t i = heap_size_; i < new_size; i++)
+		rand_array_[i] = 0;
 
 	// 重新设置长度
 	heap_size_ = new_size;
 }
 
-void TimerHeap::RotateUp(TimerNode* move_node, uint32_t pos, uint32_t parent_pos)
+void HeapTimer::RotateUp(TimerNode* move_node, uint32_t pos, uint32_t parent_pos)
 {
     // 上旋和下旋的过程中节点的timer_id不变
 	while (pos > 0) {
@@ -164,7 +185,8 @@ void TimerHeap::RotateUp(TimerNode* move_node, uint32_t pos, uint32_t parent_pos
 		if (!TimervalGte(move_node->expire_time,
             heap_[parent_pos]->expire_time)) {
 			heap_[pos] = heap_[parent_pos];
-			timer_id_[heap_[parent_pos]->timer_id] = pos;
+            int32_t parent_timer_node_index = (int32_t)(heap_[parent_pos]->timer_id >> 32);
+			timer_node_index_array_[parent_timer_node_index] = pos;
 			pos = parent_pos;
 			parent_pos = GetParentPos(parent_pos);
 		} else
@@ -172,10 +194,11 @@ void TimerHeap::RotateUp(TimerNode* move_node, uint32_t pos, uint32_t parent_pos
 	}
     // 把对象放到最终的位置
 	heap_[pos] = move_node;
-	timer_id_[move_node->timer_id] = pos;
+    int32_t timer_node_index = (int32_t)(move_node->timer_id >> 32);
+	timer_node_index_array_[timer_node_index] = pos;
 }
 
-void TimerHeap::RotateDown(TimerNode* move_node, uint32_t pos, uint32_t child_pos)
+void HeapTimer::RotateDown(TimerNode* move_node, uint32_t pos, uint32_t child_pos)
 {
     // 上旋和下旋的过程中节点的timer_id不变
 	while (child_pos < cur_size_) {
@@ -188,7 +211,8 @@ void TimerHeap::RotateDown(TimerNode* move_node, uint32_t pos, uint32_t child_po
         // 当前节点跟最小的儿子比较，如果大于，子节点上移
 		if (TimervalGte(move_node->expire_time, heap_[child_pos]->expire_time)) {
 			heap_[pos] = heap_[child_pos];
-			timer_id_[heap_[child_pos]->timer_id] = pos;
+            int32_t child_timer_node_index = (int32_t)(heap_[child_pos]->timer_id >> 32);
+			timer_node_index_array_[child_timer_node_index] = pos;
 			pos = child_pos;
 			child_pos = GetLeftChildPos(pos);
 		}
@@ -197,10 +221,11 @@ void TimerHeap::RotateDown(TimerNode* move_node, uint32_t pos, uint32_t child_po
 	}
     // 把对象放到最终的位置
 	heap_[pos] = move_node;
-	timer_id_[move_node->timer_id] = pos;
+    int32_t timer_node_index = (int32_t)(move_node->timer_id >> 32);
+	timer_node_index_array_[timer_node_index] = pos;
 }
 
-TimerHeap::TimerNode* TimerHeap::RemoveNode(int32_t del_node_pos)
+HeapTimer::TimerNode* HeapTimer::RemoveNode(int32_t del_node_pos)
 {
     if (cur_size_ == 0)
         return NULL;
@@ -215,7 +240,8 @@ TimerHeap::TimerNode* TimerHeap::RemoveNode(int32_t del_node_pos)
 	if ((uint32_t)del_node_pos < cur_size_) {
 		TimerNode* move_node = heap_[cur_size_];
 		heap_[del_node_pos] = move_node;
-		timer_id_[move_node->timer_id] = del_node_pos;
+        int32_t timer_node_index = (int32_t)(move_node->timer_id >> 32);
+        timer_node_index_array_[timer_node_index] = del_node_pos;
 
 		uint32_t parent_pos = GetParentPos(del_node_pos);
 

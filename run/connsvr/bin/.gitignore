@@ -4,3 +4,4 @@
 !.gitignore
 !start.sh
 !stop.sh
+*.pid

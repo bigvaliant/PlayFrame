@@ -207,64 +207,6 @@ void MsgModule::Run()
     }
 }
 
-//int32_t MsgModule::OnConnProcess(ProtoCs::Msg* msg, void* arg)
-//{
-    //UNUSE_ARG(arg);
-    //int32_t conn_cmd = msg->head().conn_cmd();
-    //ObjMgrModule* obj_mgr_module = FindModule<ObjMgrModule>(app_);
-
-    //if (conn_cmd == ProtoCs::CONN_START) {
-        //// 分配内存对象 
-        //LOG(INFO) << "CONN_START";
-        //int32_t player_idx = obj_mgr_module->add_player();
-        //Player* player =  obj_mgr_module->get_player(player_idx);
-        //if (player == NULL) {
-            //// 内存池满了
-            //LOG(ERROR) << "create_player error!"; 
-            //msg->head().set_player_idx(0);
-
-            //int32_t cmd = msg->head().cmd();
-            //if (cmd == ProtoCs::kLoginReqFieldNumber) {
-                //msg->head().set_cmd(ProtoCs::Msg::kLoginResFieldNumber);
-                //msg->head().set_ret(ProtoCs::RET_LOGIN_GAMESVR_FULL);
-            //} else if (cmd == ProtoCs::Msg::kQuickRegReqFieldNumber) {
-                //msg->head().set_cmd(ProtoCs::Msg::kQuickRegResFieldNumber);
-                //msg->head().set_ret(ProtoCs::RET_QUICK_REG_GAMESVR_FULL);
-            //} else if (cmd == ProtoCs::Msg::kNormalRegReqFieldNumber) {
-                //msg->head().set_cmd(ProtoCs::Msg::kNormalRegResFieldNumber);
-                //msg->head().set_ret(ProtoCs::RET_NORMAL_REG_GAMESVR_FULL);
-            //}
-
-            //SendCloseToConnsvr(msg, conn_data->conn_fd(), 0);
-            //return -1;
-        //}
-
-        //conn_data->set_player_idx(player_idx);
-        //player->set_conn_fd(conn_data->conn_fd());
-        //return 0;
-    //} else if (conn_cmd == ProtoCs::CONN_STOP) {
-        //LOG(INFO) << "CONN_STOP";
-        //LOG(INFO)
-            //<< "player_idx[" << conn_data->player_idx()
-            //<< "] client disconnected";
-        //Player* player =  obj_mgr_module->get_player(conn_data->player_idx());
-        //if (player != NULL) {
-            //LOG(INFO) << "update_player_data";
-            //player->do_update_player_data();
-        //} else {
-            //LOG(ERROR) << "update_player_data get_player error";
-        //}
-        //obj_mgr_module->del_player(conn_data->player_idx());
-        //return -2;
-    //} else if (conn_cmd == ProtoCs::CONN_INPROC) {
-        //LOG(INFO) << "CONN_INPROC";
-        //return 0;
-    //}
-
-    //LOG(ERROR) << "unkown conn_cmd[" << conn_cmd << "]";
-    //return -3;
-//}
-
 int32_t MsgModule::OnClientQuickRegReq(ProtoCs::Msg* msg, void* arg)
 {
     ConnData* conn_data = (ConnData*)arg;
@@ -275,10 +217,8 @@ int32_t MsgModule::OnClientQuickRegReq(ProtoCs::Msg* msg, void* arg)
         return -1;
     }
 
-    lua_engine_module->SetGlobal("RES_CMD", ProtoCs::Msg::kQuickRegResFieldNumber);
-    lua_engine_module->SetGlobal("SEQ", msg->head().seq());
-    lua_engine_module->SetGlobal("PLAYER_IDX", conn_data->player_idx);
-    lua_engine_module->Resume(task_id, CHECK_SIG_OK);
+    lua_engine_module->Resume(task_id, task_id, msg->head().seq(),
+            conn_data->player_idx, ProtoCs::Msg::kQuickRegResFieldNumber);
 
     return 0;
 }
@@ -294,13 +234,10 @@ int32_t MsgModule::OnClientNormalRegReq(ProtoCs::Msg* msg, void* arg)
     }
 
     const ProtoCs::NormalRegReq& normal_reg_req = msg->normal_reg_req();
-    lua_engine_module->SetGlobal("ACCOUNT", normal_reg_req.account().c_str());
-    lua_engine_module->SetGlobal("PASSWORD", normal_reg_req.password().c_str());
-    lua_engine_module->SetGlobal("SEQ", msg->head().seq());
-    lua_engine_module->SetGlobal("PLAYER_IDX", conn_data->player_idx);
-    lua_engine_module->SetGlobal("RES_CMD", ProtoCs::Msg::kNormalRegResFieldNumber);
 
-    lua_engine_module->Resume(task_id, CHECK_SIG_OK);
+    lua_engine_module->Resume(task_id, task_id, normal_reg_req.account().c_str(),
+            normal_reg_req.password().c_str(), msg->head().seq(),
+            conn_data->player_idx, ProtoCs::Msg::kNormalRegResFieldNumber);
 
     return 0;
 }
@@ -332,12 +269,9 @@ int32_t MsgModule::OnClientLoginReq(ProtoCs::Msg* msg, void* arg)
         LOG(ERROR) << "task_id = " << task_id << "error"; 
         return -1;
     }
-    lua_engine_module->SetGlobal("UID", uid);
-    lua_engine_module->SetGlobal("PASSWORD_HASH", password_hash);
-    lua_engine_module->SetGlobal("SEQ", msg->head().seq());
-    lua_engine_module->SetGlobal("PLAYER_IDX", conn_data->player_idx);
-    lua_engine_module->SetGlobal("RES_CMD", ProtoCs::Msg::kLoginResFieldNumber);
-    lua_engine_module->Resume(task_id, CHECK_SIG_OK);
+    lua_engine_module->Resume(task_id, task_id, uid, password_hash,
+            msg->head().seq(), conn_data->player_idx, 
+            ProtoCs::Msg::kLoginResFieldNumber);
 
     return 0;
 }
@@ -347,16 +281,10 @@ int32_t MsgModule::OnDatasvrAccountRegRes(ProtoSs::Msg* msg, void* arg)
     UNUSE_ARG(arg);
     LuaEngineModule* lua_engine_module = FindModule<LuaEngineModule>(app_);
     uint64_t task_id = msg->head().seq();
-    int32_t ret = msg->head().ret();
-    LOG(INFO) << "account reg result[" << ret << "]";
+    int32_t account_reg_flag = msg->head().ret();
+    LOG(INFO) << "account reg result[" << account_reg_flag << "]";
 
-    if (ret == 0) {
-        lua_engine_module->SetGlobal("ACCOUNT_REG_FLAG", 0);
-    } else {
-        lua_engine_module->SetGlobal("ACCOUNT_REG_FLAG", 1);
-    }
-
-    lua_engine_module->Resume(task_id, CHECK_SIG_OK);
+    lua_engine_module->Resume(task_id, account_reg_flag);
 
     return 0;
 }
@@ -417,12 +345,11 @@ int32_t MsgModule::OnDatasvrGetPlayerDataRes(ProtoSs::Msg* msg, void* arg)
             }
         }
         
-        lua_engine_module->SetGlobal("PLAYER_DATA_FLAG", 0);
+        lua_engine_module->Resume(task_id, 0);
     } else {
-        lua_engine_module->SetGlobal("PLAYER_DATA_FLAG", 1);
+        lua_engine_module->Resume(task_id, 1);
     }
 
-    lua_engine_module->Resume(task_id, CHECK_SIG_OK);
 
     return 0;
 }
@@ -432,21 +359,15 @@ int32_t MsgModule::OnDatasvrSetPlayerDataRes(ProtoSs::Msg* msg, void* arg)
     UNUSE_ARG(arg);
     LuaEngineModule* lua_engine_module = FindModule<LuaEngineModule>(app_);
     uint64_t task_id = msg->head().seq();
-    int32_t ret = msg->head().ret();
+    int32_t update_player_data_flag = msg->head().ret();
     int32_t player_idx = msg->head().player_idx();
     LOG(INFO)
-        << "get player_data result[" << ret
+        << "get player_data result[" << update_player_data_flag
         << "] player_idx[" << player_idx
         << "] seq[" << task_id 
         << "]";
 
-    if (ret == 0) {
-        lua_engine_module->SetGlobal("UPDATE_PLAYER_DATA_FLAG", 0);
-    } else {
-        lua_engine_module->SetGlobal("UPDATE_PLAYER_DATA_FLAG", 1);
-    }
-
-    lua_engine_module->Resume(task_id, CHECK_SIG_OK);
+    lua_engine_module->Resume(task_id, update_player_data_flag);
 
     return 0;
 }

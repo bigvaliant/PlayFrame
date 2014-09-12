@@ -6,58 +6,47 @@
 -- @date 2014-05-03
 ----------------------------------------
 
+-- @brief lua info级别打印日志
+-- @author fergus
+function LOG_INFO(...)
+    C_LOG_INFO(string.format(...))
+end
+
+-- @brief lua error级别打印日志
+-- @author fergus
+function LOG_ERROR(...)
+    C_LOG_ERROR(string.format(...))
+end
+
 -- @brief 模块加载, 替代require
 -- @author fergus
 function REQUIRE_EX(name)
     if package.loaded[name] then
-        LOG_INFO("require_ex module[" .. name "] reload")
+        LOG_INFO("require_ex module[%s] reload", name)
         package.loaded[name] = nil
     else
-        LOG_INFO("require_ex module[" .. name .. "] first load")
+        LOG_INFO("require_ex module[%s] first load", name)
     end
 
     local ret = require(name)
     local ret_type = type(ret)
 
     if (ret_type == "boolean") then
-        LOG_INFO("require_ex global")
+        LOG_INFO("%s", "require_ex global")
     elseif (ret_type == "table") then
-        LOG_INFO("require_ex table")
+        LOG_INFO("%s", "require_ex table")
         _G[name] = ret
     else
-        LOG_INFO("require_ex unkown format")
+        LOG_INFO("%s", "require_ex unkown format")
         error("require_ex unkown format")
     end
-end
-
--- @brief 异步TASK YIELD, 增加rand_id校验, 替代yield
--- @author fergus
-function CO_YIELD(rand_id)
-    local status = 1 
-    while (status~= 0) do
-        LOG_INFO("yield to cpp...")
-        coroutine.yield()
-
-        LOG_INFO("resume to lua...")
-        if (CHECK_SIG ~= 0) then
-            LOG_INFO("CHECK_SIG[" .. CHECK_SIG .. "] ~= 0")
-            return CHECK_SIG 
-        end 
-
-        if (CHECK_RAND_ID ~= rand_id) then
-            LOG_INFO("CHECK_RAND_ID[" .. CHECK_RAND_ID .. "] ~= rand_id[" .. rand_id .. "]")
-        else
-            status = 0 
-            return 0
-        end 
-    end -- while
 end
 
 -- @brief lua模块热更新
 -- @author fergus
 function RELOAD()
-    LOG_INFO("main.lua RELOAD...")
-    LOG_INFO(LUA_SCRIPT_PATH)
+    LOG_INFO("%s", "main.lua RELOAD...")
+    LOG_INFO("%s", LUA_SCRIPT_PATH)
     local ls_cmd = "ls "
         .. LUA_SCRIPT_PATH .. "/*.lua "
         .. LUA_SCRIPT_PATH .. "/*.so "

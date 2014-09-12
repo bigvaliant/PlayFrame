@@ -11,7 +11,6 @@
 #include "comm_def.h"
 #include "shm_pool.h"
 #include "time_value.h"
-#include "timer_heap.h"
 #include "server_frame.h"
 #include "msg_module_base.h"
 #include "lua_config.h"

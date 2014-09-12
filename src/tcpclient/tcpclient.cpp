@@ -24,7 +24,9 @@ int main()
         exit(0);
     }
 
-    MsgMgr::GetInstance().DispatchReqMsg(ProtoCs::Msg::kLoginReqFieldNumber);
+    MsgMgr::GetInstance().DispatchReqMsg(ProtoCs::Msg::kQuickRegReqFieldNumber);
+    //MsgMgr::GetInstance().DispatchReqMsg(ProtoCs::Msg::kNormalRegReqFieldNumber);
+    //MsgMgr::GetInstance().DispatchReqMsg(ProtoCs::Msg::kLoginReqFieldNumber);
 
     while(1) {
         NetMgr::GetInstance().Run();

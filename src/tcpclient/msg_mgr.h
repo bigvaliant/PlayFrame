@@ -15,12 +15,14 @@
 #define PKG_BUF_SIZE 10240
 
 #define REGISTER_MSG(REQ_MSG_ID, REQ_MSG_FUNC, RES_MSG_ID, RES_MSG_FUNC) \
+        do { \
         MsgWrapper * msg_wrapper = static_cast<MsgWrapper*> \
         (new MsgWrapperImpl<MsgMgr, ProtoCs::Msg>(this, REQ_MSG_FUNC, RES_MSG_FUNC));   \
         assert(msg_wrapper != NULL); \
         MsgMgr::GetInstance().RegisterReqMsg(REQ_MSG_ID, msg_wrapper); \
         MsgMgr::GetInstance().RegisterResMsg(RES_MSG_ID, msg_wrapper); \
         msg_wrapper = NULL; \
+        } while(0) \
 
 class MsgMgr
 {
@@ -47,6 +49,12 @@ public:
 public:
     int32_t DoLogin(ProtoCs::Msg* msg, void* args);
     int32_t OnLogin(ProtoCs::Msg* msg, void* args);
+
+    int32_t DoNormalReg(ProtoCs::Msg* msg, void* args);
+    int32_t OnNormalReg(ProtoCs::Msg* msg, void* args);
+
+    int32_t DoQuickReg(ProtoCs::Msg* msg, void* args);
+    int32_t OnQuickReg(ProtoCs::Msg* msg, void* args);
 
 private:
     void FreeMap();
