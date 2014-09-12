@@ -100,4 +100,9 @@ TimerNodeIndexArray: 用于存储TimerNode的数组下标, 因为TimerNodeArray�
 RandArray: 用于在定时器注册的时候, 分配一个随机值, TimerNodeIndexArray数组下标跟该随机值组成timer_id, 这样保证timer_id在大部分情况下的唯一性.  
 
 ![link](https://github.com/zfengzhen/Blog/blob/master/img/PlayFrame_heaptimer.png)  
+
+时间复杂度:   
+查找定时器: O(1)    
+查找到定时器调整或者删除: O(logN)   
+插入定时器: O(logN)  
   
