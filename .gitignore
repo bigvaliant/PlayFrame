@@ -18,6 +18,7 @@
 *.out
 *.app
 
+# Run Pid & Log
 *.pid
 *.log
 
