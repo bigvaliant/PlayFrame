@@ -106,3 +106,44 @@ RandArray: 用于在定时器注册的时候, 分配一个随机值, TimerNodeIn
 查找到定时器调整或者删除: O(logN)   
 插入定时器: O(logN)  
   
+## 异步任务之lua协程模型    
+### 异步任务   
+在单进程异步IO模型中常见, 一个任务需要多步完成, 其中多步大部分情况是指跟多个其他后台服务交互获取数据, 如果同步的话会影响使得系统性能大幅下降, 引入异步任务方式.  
+
+### 异步任务处理   
+1. 请求--->保存上下文--->异步逻辑(其他后台服务)    
+2. 异步逻辑回包--->恢复上下文--->本地逻辑--->保存上下文--->异步逻辑(其他后台服务)    
+3. 异步逻辑回包--->恢复上下文--->本地逻辑--->响应请求   
+
+### 上下文保存的两种方式  
+1. 上下文保存在网络请求协议中, 回包时原样回传(依赖于后端服务提供echo_buf功能)    
+2. 创建任务唯一表示id, 本地保存id对应的上下文, 回包时后端服务原样回传id, 通过id获取上下文   
+
+### 异步任务常用实现方式---Task异步模型     
+![](https://github.com/zfengzhen/Blog/blob/master/img/lua_async_task_task_model.png)    
+Task为一个基类, 里面主要包含了一个Step类实例的链表.   
+需要提供如下接口:  
+1. OnTaskFailed 超时处理接口  
+2. OnTaskSuccessed 任务成功完成时处理接口  
+
+Step也为一个基类, 表示具体的异步步骤.  
+需要提供如下接口:  
+1. OnStepPerform 异步任务执行(发包), 执行完后回到游戏主逻辑循环  
+2. OnStepNotify 异步任务回调通知, 表示该步骤回调完成, 如果成功跳转到Task的下一个Step, 否则执行OnTaskFailed  
+
+异步任务需要继承Task, 并实现相应的具体Step, 每个Task和Step都得继承上述的接口, 阅读代码时, 具体的Step分散在各个地方, 可读性相对较差.  
+
+### lua协程模型
+一个异步任务即为一个lua协程, 协程保存异步任务的上下文信息, 一个lua协程中只包含一个具体的lua函数, 通过调用该lua函数采用lua的协程机制去粘合具体的异步任务, 需要将C++中的逻辑API解耦抽象出来, 传入lua中, 通过lua的协程去粘合具体需要调用的逻辑API, 使其具有顺序的代码可读性.   
+
+超时处理:  
+创建任务时, 分配一个定时器, 该定时器ID唯一, 也用该ID表示任务唯一ID, 也即是异步网络协议中必须传输的唯一标识上下文的ID. 超时后, 关闭该定时器, 以及关闭该协程(超时响应交给客户端自己去识别, 服务器不下发后端超时协议).   
+
+#### PlayFrame中lua协程模型的实现  
+1. GameSvr包含5个模块, ConfigModule(读取配置文件模块), MsgModule(消息处理模块), LuaEngineModule(lua异步任务处理模块), TimerMgrModule(定时器管理模块), ObjMgrModule(内存池对象管理模块)  
+2. 游戏主循环: MsgModule一直非阻塞循环接收消息以及LuaEngineModule非阻塞循环触发定时器看是否有任务超时.   
+3. MsgModule接收请求后, 通过调用LuaEngineModule创建具体异步任务, 分配任务ID, 绑定ID跟该任务协程的映射, 将具体的lua函数压入协程, 通过lua_resume传入参数, 任务开始执行  
+4. MsgModule接收到后端的响应回包后, 根据回包中的唯一ID获取到具体协程, 解析协议中相应字段, 通过lua_resume压入协程中恢复协程执行, 异步任务继续执行.  
+
+![](https://github.com/zfengzhen/Blog/blob/master/img/PlayeFrame_lua_coroutine_async.png)   
+
