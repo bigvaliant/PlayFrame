@@ -28,7 +28,7 @@ function login(task_id, uid, password_hash, seq, player_idx, res_cmd)
         local update_count = 0
         while (update_player_data_flag ~= 0 and update_count < 5) do
             old_player:do_update_player_data(task_id)
-            update_player_data_flag = coroutine.yield()
+            update_player_data_flag = CO_YIELD(old_player:do_update_player_data(task_id))
         end
 
         OBJ_MGR_MODULE:del_player(old_player_idx)
@@ -39,9 +39,7 @@ function login(task_id, uid, password_hash, seq, player_idx, res_cmd)
         end
     end
 
-    player:do_get_player_data(task_id, uid, password_hash);
-
-    local get_player_data_flag = coroutine.yield()
+    local get_player_data_flag = CO_YIELD(player:do_get_player_data(task_id, uid, password_hash))
     if (get_player_data_flag ~= 0) then
         player:send_failed_cs_res(seq, res_cmd, -1)
         return

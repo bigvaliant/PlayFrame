@@ -38,9 +38,7 @@ function quick_reg(task_id, seq, player_idx, res_cmd)
         password_len = #password 
         password_hash = fnv_64a_hash(password, password_len)
         LOG_INFO("%s", tostring(password_hash))
-        player:do_account_reg(task_id, uid, password_hash, "")
-
-        local account_reg_flag = coroutine.yield()
+        local account_reg_flag = CO_YIELD(player:do_account_reg(task_id, uid, password_hash, ""))
 
         if (account_reg_flag == 0) then
             player:send_ok_cs_quick_reg_res(seq, uid, password)
@@ -86,8 +84,7 @@ function normal_reg(task_id, account, password, seq, player_idx, res_cmd)
     local uid = fnv_64a_hash(account, #account)
     local password_hash = fnv_64a_hash(password, #password)
     player:do_account_reg(task_id, uid, password_hash, account)
-
-    local account_reg_flag = coroutine.yield()
+    local account_reg_flag = CO_YIELD(player:do_account_reg(task_id, uid, password_hash, account))
 
     if (account_reg_flag == 0) then
         player:send_ok_cs_normal_reg_res(seq, account, password)

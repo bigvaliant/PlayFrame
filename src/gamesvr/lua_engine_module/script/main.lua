@@ -18,6 +18,12 @@ function LOG_ERROR(...)
     C_LOG_ERROR(string.format(...))
 end
 
+-- @brief 执行函数后yield
+-- @author fergus
+function CO_YIELD()
+    return coroutine.yield()
+end
+
 -- @brief 模块加载, 替代require
 -- @author fergus
 function REQUIRE_EX(name)
