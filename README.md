@@ -6,7 +6,7 @@ A game server develop framework for using lua coroutine as asynchronous task.
 ## PlayFrame游戏架构
 ![](https://github.com/zfengzhen/Blog/blob/master/img/PlayFrame游戏架构.png)
 
-## C++类成员函数回调实现
+## 第一节 C++类成员函数回调实现
 C++类成员函数回调跟C函数回调不同的是必须绑定类的实例, 知道是具体某个实例的回调.   
    
 1 实现一个虚基类, 使其拥有一个固定的回调执行函数.     
@@ -70,7 +70,7 @@ private:
 };
 ```   
 
-## 线性同余数随机数生成器
+## 第二节 线性同余数随机数生成器
 参见[数据结构与算法分析10.4](http://book.douban.com/subject/1139426/)  
 
 >> 产生随机数最简单的方法是线性同余数发生器, 它于1951年由Lehmer首先描述: 数x1, x2, .......的生成满足  
@@ -106,7 +106,7 @@ RandArray: 用于在定时器注册的时候, 分配一个随机值, TimerNodeIn
 查找到定时器调整或者删除: O(logN)   
 插入定时器: O(logN)  
   
-## 异步任务之lua协程模型    
+## 第三节 异步任务之lua协程模型    
 ### 异步任务   
 在单进程异步IO模型中常见, 一个任务需要多步完成, 其中多步大部分情况是指跟多个其他后台服务交互获取数据, 如果同步的话会影响使得系统性能大幅下降, 引入异步任务方式.  
 
@@ -145,5 +145,51 @@ Step也为一个基类, 表示具体的异步步骤.
 3. MsgModule接收请求后, 通过调用LuaEngineModule创建具体异步任务, 分配任务ID, 绑定ID跟该任务协程的映射, 将具体的lua函数压入协程, 通过lua_resume传入参数, 任务开始执行  
 4. MsgModule接收到后端的响应回包后, 根据回包中的唯一ID获取到具体协程, 解析协议中相应字段, 通过lua_resume压入协程中恢复协程执行, 异步任务继续执行.  
 
-![](https://github.com/zfengzhen/Blog/blob/master/img/PlayeFrame_lua_coroutine_async.png)   
+![](https://github.com/zfengzhen/Blog/blob/master/img/PlayeFrame_lua_coroutine_async.png)  
+
+## 第四节 高效的epoll事件回调封装  
+主要参考redis ae.h ae.c ae_epoll.c文件  
+
+```c++
+#define EVENT_NONE 0
+#define EVENT_READ 1
+#define EVENT_WRITE 2
+
+typedef void FileProc(int fd, void* client_data); 
+
+typedef struct tagFileEvent {
+    int mask_;
+    FileProc* read_proc_;
+    FileProc* write_proc_;
+    void* client_data_;
+} FileEvent;
+
+typedef struct tagEpollEventLoop {
+    int epfd_;
+    struct epoll_event *epoll_events_;
+    int max_events_size_;
+    FileEvent* file_events_;
+} EpollEventLoop;
+```    
+
+通过Init申请要监听fd个数的大小max_events_size, 对于FileEvent和struct epoll_event数组都是以fd为数组索引进行取值, 所以最终能够监听的fd数小于max_events_size.   
+
+**添加事件**   
+传入的mask为EVENT_READ, 查看fd所在的FileEvent的mask_是否为EVENT_NONE, 如果为EVNET_NONE, 则epoll_ctl为EPOLL_CTL_ADD, 否则为EPOLL_CTL_MOD.  
+EVENT_READ传入epoll_ctl的struct epoll_evnet的事件为EPOLLIN, 并将回调函数传入到FileEvent的read_proc.    
+EVENT_WRITE传入epoll_ctl的struct epoll_evnet的事件为EPOLLOUT, 并将回调函数传入到FileEvent的write
+_proc.  
+
+**删除事件**  
+fe->mask_ = fe->mask_ & (~mask)  
+去除传入的要删除的事件(读事件或者写事件 或者全部)  
+如果fe->mask_ 为EVENT_NONE, 则调用EPOLL_CTL_DEL, 否则调用EPOLL_CTL_MOD.  
+
+**主循环**  
+```c++
+int ret = epoll_wait(ev_loop_->epfd_, ev_loop_->epoll_events_, ev_loop_->max_events_size_, timeout);
+```  
+遍历struct epoll_event数组, 如果是EPOLLIN事件调用read_proc, EPOLLOUT调用write_proc, 其他错误处理也调用write_proc.    
+
+
 
