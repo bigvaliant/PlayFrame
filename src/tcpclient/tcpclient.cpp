@@ -7,29 +7,23 @@
  */
 #include <stdio.h>
 #include "msg_mgr.h"
-#include "net_mgr.h"
 
 int main()
 {
     int ret = 0;
-    ret = MsgMgr::GetInstance().Init();
+    MsgMgr msg_mgr;
+    ret = msg_mgr.Init();
     if (ret != 0) {
         printf("MsgMgr init error\n");
         exit(0);
     }
-    
-    ret = NetMgr::GetInstance().Init();
-    if (ret != 0) {
-        printf("NetMgr init error ret[%d]\n", ret);
-        exit(0);
-    }
 
-    MsgMgr::GetInstance().DispatchReqMsg(ProtoCs::Msg::kQuickRegReqFieldNumber);
+    msg_mgr.DispatchReqMsg(ProtoCs::Msg::kQuickRegReqFieldNumber);
     //MsgMgr::GetInstance().DispatchReqMsg(ProtoCs::Msg::kNormalRegReqFieldNumber);
     //MsgMgr::GetInstance().DispatchReqMsg(ProtoCs::Msg::kLoginReqFieldNumber);
 
     while(1) {
-        NetMgr::GetInstance().Run();
+        msg_mgr.Run();
         sleep(3);
     }
 

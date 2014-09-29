@@ -46,7 +46,6 @@ void LuaEngine::Fini()
     while (it != co_map_.rend()) {
         lua_State* co= it->second;
         if (co != NULL) {
-            lua_close(co);
             co = NULL;
         }
         ++it;
@@ -159,6 +158,8 @@ int64_t LuaEngine::CreateTask(const char* lua_func, time_t task_delay_secs)
         return -1;
     }
 
+    // There is no explicit function to close or to destroy a thread. 
+    // Threads are subject to garbage collection, like any Lua object.
     lua_State* co = lua_newthread(master_state_);
     if (co == NULL) {
         LOG(ERROR) << "lua_newthread error!"; 
@@ -188,7 +189,6 @@ void LuaEngine::CloseTask(int64_t task_id)
         LOG(INFO)
             << "close task[" << task_id
             << "]";
-        lua_close(co_map_[task_id]);
         co_map_.erase(task_id);
         heap_timer_->UnregisterTimer(task_id);
     }
