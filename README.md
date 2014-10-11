@@ -191,5 +191,108 @@ int ret = epoll_wait(ev_loop_->epfd_, ev_loop_->epoll_events_, ev_loop_->max_eve
 ```  
 遍历struct epoll_event数组, 如果是EPOLLIN事件调用read_proc, EPOLLOUT调用write_proc, 其他错误处理也调用write_proc.    
 
+## 第六节 GLOG功能修改  
+### 1、按天增加日志   
+utilities.cc  
+```c
+static int32 g_main_day = 0;
+bool DayHasChanged()
+{
+    time_t raw_time;
+    struct tm* tm_info;
+    time(&raw_time);
+    tm_info = localtime(&raw_time);
+    if (g_main_day == 0)
+        return false;
+    if (tm_info->tm_mday != g_main_day) {
+        g_main_day = tm_info->tm_mday;
+        return true;
+    }
+    return false;
+} 
+```
 
+logging.cc LogFileObject::Write  
+```c
+  if (DayHasChanged()) {
+    if (file_ != NULL) fclose(file_);
+    file_ = NULL;
+    file_length_ = bytes_since_flush_ = 0;
+    rollover_attempt_ = kRolloverAttemptFrequency-1;
+  }
+```
 
+### 
+2、只以年月日为结尾文件名，超过一定大小在文件名后增加.1 .2标识符    
+比如： gamesvr_info_20140416.log gamesvr_info_20140416.log.1  
+logging.cc LogFileObject::Write  
+
+```c
+  static int32_t changed_time = 0;
+  if (static_cast<int>(file_length_ >> 20) >= MaxLogSize()) {
+    changed_time++;
+    if (file_ != NULL) fclose(file_);
+    file_ = NULL;
+    struct ::tm tm_time;
+    localtime_r(&timestamp, &tm_time);
+                                     
+    ostringstream time_pid_stream;
+    time_pid_stream.fill('0');
+    time_pid_stream << 1900+tm_time.tm_year
+          << setw(2) << 1+tm_time.tm_mon
+          << setw(2) << tm_time.tm_mday
+          << ".log";
+                   
+    ostringstream new_time_pid_stream;
+    new_time_pid_stream.fill('0');
+    new_time_pid_stream << 1900+tm_time.tm_year
+          << setw(2) << 1+tm_time.tm_mon
+          << setw(2) << tm_time.tm_mday
+          << ".log"
+          << "." << changed_time;
+                                
+    const string& time_pid_string = time_pid_stream.str();
+    const string& new_time_pid_string = new_time_pid_stream.str();
+                                                               
+    string string_filename = base_filename_+filename_extension_+
+          time_pid_string;
+    string new_string_filename = base_filename_+filename_extension_+
+          new_time_pid_string;
+                             
+    const char* filename = string_filename.c_str();
+    const char* new_filename = new_string_filename.c_str();
+                             
+    rename(filename, new_filename);
+                             
+    file_length_ = bytes_since_flush_ = 0;
+    rollover_attempt_ = kRolloverAttemptFrequency-1;
+  }
+```
+
+### 3、错误日志分级，只写入指定级别文件  
+glog/logging.h  
+```c
+DECLARE_bool(servitysinglelog);  
+```
+
+logging.cc  
+```c
+GLOG_DEFINE_bool(servitysinglelog, true,
+                 "Prepend the log prefix to the start of each log line");
+```
+
+logging.cc LogDestination::LogToAllLogfiles  
+```c
+  if ( FLAGS_logtostderr ) {           // global flag: never log to file
+    ColoredWriteToStderr(severity, message, len);
+  } else {
+    // edit by zfengzhen : add FLAGS_servitysinglelog
+    if (FLAGS_servitysinglelog) {
+        LogDestination::MaybeLogToLogfile(severity, timestamp, message, len);
+    } else {
+        for (int i = severity; i >= 0; --i)
+            LogDestination::MaybeLogToLogfile(i, timestamp, message, len);
+    }
+  }
+}
+```
