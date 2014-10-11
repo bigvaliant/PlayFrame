@@ -222,8 +222,7 @@ logging.cc LogFileObject::Write
   }
 ```
 
-### 
-2、只以年月日为结尾文件名，超过一定大小在文件名后增加.1 .2标识符    
+### 2、只以年月日为结尾文件名，超过一定大小在文件名后增加.1 .2标识符    
 比如： gamesvr_info_20140416.log gamesvr_info_20140416.log.1  
 logging.cc LogFileObject::Write  
 
