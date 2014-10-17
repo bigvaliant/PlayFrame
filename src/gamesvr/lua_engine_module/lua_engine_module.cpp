@@ -18,7 +18,13 @@ LuaEngineModule::LuaEngineModule(App* app,
 }
 
 LuaEngineModule::~LuaEngineModule()
-{}
+{
+    while (GetTaskSize() != 0) {
+        LOG(INFO) << "wait for [" << GetTaskSize() << "] to finish!";
+        Run();
+        sleep(1);  
+    }
+}
 
 void LuaEngineModule::ModuleInit()
 {
