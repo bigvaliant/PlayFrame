@@ -145,6 +145,11 @@ Step也为一个基类, 表示具体的异步步骤.
 3. MsgModule接收请求后, 通过调用LuaEngineModule创建具体异步任务, 分配任务ID, 绑定ID跟该任务协程的映射, 将具体的lua函数压入协程, 通过lua_resume传入参数, 任务开始执行  
 4. MsgModule接收到后端的响应回包后, 根据回包中的唯一ID获取到具体协程, 解析协议中相应字段, 通过lua_resume压入协程中恢复协程执行, 异步任务继续执行.  
 
+程序挂掉如何保证重启后lua协程信息不会丢失?  
+1 协程信息保存到共享内存中, 进程拉起后重读共享内存, 恢复协程状态   
+2 类似于线程池的处理办法, 进程关闭时, 不接受新的请求, 等待所有之前的协程结束后才退出.  
+PlayFrame采用第二种方法    
+
 ![](https://github.com/zfengzhen/Blog/blob/master/img/PlayeFrame_lua_coroutine_async.png)  
 
 ## 第五节 高效的epoll事件回调封装  
